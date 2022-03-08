@@ -1,13 +1,13 @@
-const { Engine, World, Bodies, Body } = Matter;
+const { Engine, World, Bodies, Body, Sleeping } = Matter;
 let engine, world;
 
 const colors = ['#ff2828', '#23b4ff'];
-let keys = [];
 
 const screenRatio = 3.5 / 2;
 let su = 1 / 30;
+let keys = [];
 
-let player;
+let players = [];
 let obstacles = [];
 
 function setup() {
@@ -32,8 +32,8 @@ function setup() {
     ob.body.restitution = 1;
   });
 
-  player = new Player(100, 100, su, su, 0);
-  Body.setVelocity(player.body, { x: 2, y: -2 });
+  players[0] = new Player(3.5 * su, height / 2, 0);
+  players[1] = new Player(width - 3.5 * su, height / 2, 1);
 
   noStroke();
 }
@@ -49,8 +49,10 @@ function draw() {
   fill(colors[1]);
   rect(width / 2, 0, width / 2, height);
 
-  player.step();
-  player.show();
+  players.forEach((player) => {
+    player.step(deltaTime);
+    player.show();
+  });
 
   obstacles.forEach((ob) => ob.show());
 }
@@ -82,45 +84,96 @@ class RectBody {
     fill(0);
     rect(0, 0, this.w, this.h);
   }
+
+  applyForce(x, y) {
+    Body.applyForce(this.body, this.body.position, { x: x, y: y });
+  }
 }
 
 class Player extends RectBody {
-  constructor(x, y, w, h, team) {
-    super(x, y, w, h, { friction: 0, frictionAir: 0.03, restitution: 0.2 });
+  constructor(x, y, team) {
+    super(x, y, su, su, {
+      friction: 0,
+      frictionStatic: 0,
+      frictionAir: 0.03,
+      restitution: 1,
+    });
+    this.body.label = 'Player ' + team;
+
     this.team = team;
+    this.deadTimer = 0;
+    this.dead = false;
+
+    this.body.onCollide((cb) => {
+      let other;
+      if (cb.bodyA.id == this.body.id) other = cb.bodyB;
+      else other = cb.bodyA;
+
+      let otherType = other.label.split(' ');
+      if (otherType[0] == 'Player') {
+        this.collidePlayer(parseInt(otherType[1]));
+      } else if (otherType[0] == 'Flag') {
+        this.collideFlag(other);
+      }
+    });
   }
 
-  step() {
+  collidePlayer(otherID) {
+    // let opos = other.position;
+    let pos = this.body.position;
+
+    let zone = pos.x < width / 2 ? 0 : 1;
+    if (zone != this.team && players[otherID].dead == false) this.die();
+  }
+
+  step(delta) {
     // this.body.angle = 0;
 
-    let speed = su / 20000;
-    if (keys[68])
-      Body.applyForce(this.body, this.body.position, { x: speed, y: 0 });
-    if (keys[65])
-      Body.applyForce(this.body, this.body.position, { x: -speed, y: 0 });
-    if (keys[87])
-      Body.applyForce(this.body, this.body.position, { x: 0, y: -speed });
-    if (keys[83])
-      Body.applyForce(this.body, this.body.position, { x: 0, y: speed });
+    if (this.dead) {
+      this.deadTimer -= delta;
+      if (this.deadTimer <= 0) {
+        this.dead = false;
+        Sleeping.set(this.body, false);
+      } else {
+        return;
+      }
+    }
 
-    // if (keys[39]) Body.applyForce(this.body, this.body.position, {x: speed, y: 0})
-    // if (keys[37]) Body.applyForce(this.body, this.body.position, {x: -speed, y: 0})
-    // if (keys[38]) Body.applyForce(this.body, this.body.position, {x: 0, y: -speed})
-    // if (keys[40]) Body.applyForce(this.body, this.body.position, {x: 0, y: speed})
+    let speed = su / 20000;
+
+    if (this.team == 0) {
+      if (keys[68]) this.applyForce(speed, 0);
+      if (keys[65]) this.applyForce(-speed, 0);
+      if (keys[87]) this.applyForce(0, -speed);
+      if (keys[83]) this.applyForce(0, speed);
+    } else {
+      if (keys[39]) this.applyForce(speed, 0);
+      if (keys[37]) this.applyForce(-speed, 0);
+      if (keys[38]) this.applyForce(0, -speed);
+      if (keys[40]) this.applyForce(0, speed);
+    }
   }
 
   display() {
     rectMode(CENTER);
-    fill(0);
+    fill(this.dead ? 80 : 0);
     rect(0, 0, this.w, this.h);
     fill(colors[this.team]);
     rect(0, 0, this.w - su / 4, this.h - su / 4);
+  }
+
+  die() {
+    this.deadTimer = 2000;
+    this.dead = true;
+    Sleeping.set(this.body, true);
+    Body.setPosition(this.body, { x: this.x, y: this.y });
+    Body.setVelocity(this.body, { x: 0, y: 0 });
+    Body.setAngle(this.body, 0);
   }
 }
 
 function keyPressed() {
   keys[keyCode] = true;
-  console.log();
 }
 
 function keyReleased() {

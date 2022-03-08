@@ -59,3 +59,4 @@ var MatterCollisionEvents = {
 };
 
 Matter.Plugin.register(MatterCollisionEvents);
+Matter.use('matter-collision-events')
