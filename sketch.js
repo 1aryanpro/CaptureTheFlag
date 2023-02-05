@@ -102,6 +102,7 @@ class Player extends RectBody {
 
     this.team = team;
     this.deadTimer = 0;
+    this.deadTimerLen = 2000;
     this.dead = false;
 
     this.body.onCollide((cb) => {
@@ -156,14 +157,19 @@ class Player extends RectBody {
 
   display() {
     rectMode(CENTER);
-    fill(this.dead ? 80 : 0);
+    fill(0);
     rect(0, 0, this.w, this.h);
     fill(colors[this.team]);
     rect(0, 0, this.w - su / 4, this.h - su / 4);
+
+    if (this.dead) {
+      arc(0, 0, this.w * 1.5, this.h * 1.5, -HALF_PI + (1 - this.deadTimer / this.deadTimerLen) * TWO_PI, -HALF_PI)
+      // arc(0, 0, this.w * 1.5, this.h * 1.5, -HALF_PI, 0)
+    }
   }
 
   die() {
-    this.deadTimer = 2000;
+    this.deadTimer = this.deadTimerLen;
     this.dead = true;
     Sleeping.set(this.body, true);
     Body.setPosition(this.body, { x: this.x, y: this.y });
